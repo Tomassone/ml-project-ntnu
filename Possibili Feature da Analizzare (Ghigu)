@@ -1,0 +1,434 @@
+Il task dice esplicitamente che gli input principali sono prezzo, inflow, storage e water value, con vincoli e topologia ome informazioni aggiuntive Inoltre il problema nasce proprio dal fatto che bisogna decidere se usare  acqua ora o conservarla e che i reservoir a monte influenzano quelli a valle.
+
+Io dividerei le feature in queste famiglie:
+
+1. PREZZO ELETTRICITA' (dati partono dal 2015) 11 Features -> zio pera
+File usato: Historical_day_ahead_price.csv
+
+    Terrei sicuramente i prezzi orari della settimana, ma aggiungerei feature che descrivono la forma della settimana: 
+    - price_mean_week
+            sarebbe la media dei 168 prezzi orari della settimana associati a quella riga. se una riga di unit_commitment parte da 2015-01-01 00:00 allora ci associ la media dei prezzi della settimana, da 2015-01-01 00:00 a 15-01-07 23:00. 
+
+    - price_std_week
+            è la deviazione standard di quella settimana, quindi ti dice quanto oscillano i prezzi in quella settimana. 
+            una settimana puoi avere 49, 50, 51, 50, 49, 51  e la media è 50
+            una settimana puoi avere 10, 90, 20, 100, 15, 85 e la media è 50
+            ma nella seconda settimana oscillano molto di più sono instabili e quindi la deviazione std è alta
+
+    - price_min
+            prezzo minimo della settimana ( contando tutte le ore di tutti i giorni eh)
+
+    - price_max
+            prezzo massimo della settimana
+
+    - quantili 
+            I quantili servono a descrivere meglio come sono distribuiti i 168 prezzi della settimana.
+            q25: il 25% dei prezzi della settimana è sotto questo valore
+            q50 o mediana: metà dei prezzi è sotto e metà sopra
+            q75: il 75% dei prezzi è sotto questo valore
+            robe del genere 
+
+    - differenza rispetto alla media settimanale
+            quella
+
+    - ranking del prezzo nell'arco della settimana rank_t
+            Il ranking del prezzo nella settimana dice semplicemente quanto è alto o basso il prezzo di una certa ora rispetto agli altri 167 prezzi della stessa settimana.
+            Esempio: hai 168 prezzi settimanali e, dopo averli ordinati dal più basso al più alto, il prezzo di t37 risulta essere il 150°.
+
+    - variazione rispetto all'ora precedente  price_t - price_t-1
+            quella
+
+    - media delle prossime 3/6/12 ore. 
+            quella
+
+    - price_t / price_mean_week
+            prezzo di quell'ora diviso prezzo della settimana. ti dice quanto è sopra o sotto il prezzo settimanale
+
+    - price_t - mean_price_week
+            può essere molto utile: 80 €/MWh significa una cosa diversa in una settimana in cui la media è 30 rispetto a una settimana in cui la media è 100.
+
+2. PREZZO ACQUA E ELETTRICITA'
+File usati: Historical_day_ahead_price e Synthetic_water_value
+
+    Water value + prezzo, che caht dice essere una delle interazioni più importanti. Il water value rappresenta il valore economico marginale dell'acqua conservata.      
+
+    - price_minus_water_value = price - water_value
+            Ti dice quanto il prezzo dell’elettricità è sopra o sotto il valore dell’acqua.Se è molto positivo, in linea intuitiva può essere conveniente produrre; se è negativo, può essere più conveniente conservare acqua.
+
+    - price_water_value_ratio = price / water_value
+            Ti dice quanto il prezzo corrente è grande rispetto al valore dell’acqua.Esempio: prezzo 80, water value 40 → ratio = 2.
+
+    - price_minus_water_value_normalized = (price_t - water_value) / water_value 
+
+    - is_price_above_water_value
+            1 se price_t > water_value 0 altrimenti
+
+    - price_mean_week (elettricità) - water_value
+            Non guarda la singola ora, ma confronta il valore dell’acqua con il livello medio dei prezzi della settimana.
+
+    - price_max_week - water_value. 
+            prende il prezzo più alto di tutta la settimana dell'elettricità e sottrae water value.
+            Dice se durante la settimana esistono ore molto remunerative rispetto al valore dell’acqua.
+
+   Se il prezzo è molto superiore al valore dell'acqua, intuitivamente diventa più interessante produrre; se è inferiore, può essere conveniente conservarla. Ovviamente SHOP considera molte altre cose, ma per il modello questa relazione può essere molto informativa.
+
+
+3. VOLUME D'ACQUA NEI RESERVOIR (in relazione al volume totale)
+File usato: Historical_volume
+
+    - fill_ratio
+            Praticamente noi nel file Historical_volume abbiamo quanta acqua ci sta dentro al reservoir, ma non sappiamo quanta acqua può ospitare un reservoir lol.
+            Questo dato però è nel file Yaml che definisce le propietà fisiche dell'ambaradam, quindi chat ci suggerisce di aggiungere il fill ratio. quindi il dato 50 mila litri si traduce in " il reservoir è pieno al 78%"
+
+    bravo chat questo sembra utile per davvero 
+    
+
+4. MARGINE RISPETTO AI VINCOLI MINIMI. 
+File usato: Constrain_min_volume.
+    
+    Il documento dice che quest'ultimo è il minimo consentito e interessa 3 reservoir.
+    abbiamo il volume reale dell'acqua, abbiamo il volume massimo, e ci aggiungiamo il volume minimo indispensabile.
+
+    - volume_margin = current_volume - min_volume
+    - normalized_volume_margin = (current_volume - min_volume) / max_volume
+   
+    approfondire n'attimo con chat sto discorso, perchè i reservoir coinvolti sono solo 3 :/
+  
+5. INFLOW AGGREGATO NELLA SETTIMANA
+File usato: Historical_inflow (dal 1958 soccia) 
+
+    Per una settimana abbiamo quindi 168 valori per ogni reservoir. Invece di dare al modello solo tutti i 168 valori grezzi, possiamo anche riassumere quella settimana con alcune feature.
+
+    - inflow_mean_week
+            la media dell’inflow nelle 168 ore. Dice quanta acqua entra mediamente durante la settimana.
+
+    - inflow_std_week
+            quanto varia l’inflow durante la settimana. Bassa = abbastanza costante; alta = ci sono forti variazioni.
+
+    - inflow_min_week
+            il valore minimo osservato nella settimana.
+
+    - inflow_max_week
+            il valore massimo osservato nella settimana.
+            
+    - cumulative_inflow_week
+            quanta acqua entra complessivamente durante la settimana.
+   
+
+6. INFLOW RISPETTO ALLA NORMALITA' STORICA: 
+
+    Qui l’idea è usare i dati molto vecchi, dal 1958 in poi, per capire se l’inflow attuale è normale o anomalo per quel periodo dell’anno.
+
+    - historical_mean_inflow_for_month
+
+    - inflow_anomaly = current_inflow - historical_mean
+            current_inflow possiamo decidere se mensile, giornaliero o settimanale. Chat suggerisce settimanale
+    
+    - inflow_ratio = current_inflow / historical_mean
+   
+    Quindi il modello può distinguere “20 m³/s” da “20 m³/s durante un periodo in cui normalmente ce ne sono 5”.
+
+
+7. VINCOLI MINIMI DI INFLOW 
+    Il file contiene la portata minima richiesta per 6 fiumi e vale 0 quando il vincolo non è attivo. Oltre ai valori orari, creerei:
+
+    Sono troppo stanco per capirli, ci penso in futuro 
+
+    - constraint_active = 0/1
+
+    - number_hours_constraint_active
+
+    - mean_min_flow_when_active
+
+    - max_min_flow_week
+   
+   Il semplice flag constraint_active potrebbe già essere utile.
+
+8. FEATURE TEMPORALI
+    L’idea è questa: da starttime possiamo estrarre informazioni temporali utili, perché il comportamento del sistema cambia molto durante l’anno.
+
+    Da starttime, che non darei come timestamp grezzo, ricaverei:
+    month
+    day_of_year
+    weekday
+    season
+
+    Per esempio, da starttime = 2021-01-15 possiamo ricavare:
+    month = 1
+    day_of_year = 15
+    weekday = 4
+    season = winter
+   
+    e soprattutto rappresentazioni cicliche:
+    month_sin = sin(2π * month / 12)
+    month_cos = cos(2π * month / 12)
+
+    Numericamente, per il modello:
+    distanza tra gennaio e febbraio = 1
+    distanza tra gennaio e dicembre = 11
+
+    ma nel calendario dicembre e gennaio sono vicinissimi, perché dopo dicembre viene subito gennaio. Quindi il numero grezzo del mese rappresenta male la natura ciclica del tempo.
+    Per risolvere, si usa una rappresentazione circolare con seno e coseno:
+
+    month_sin = sin(2π * month / 12)
+    month_cos = cos(2π * month / 12)
+
+    La stessa cosa si può fare con day_of_year:
+
+    day_sin = sin(2π * day_of_year / 365)
+    day_cos = cos(2π * day_of_year / 365)
+
+    chat poi dice 
+
+    Io partirei con queste:
+    - day_of_year_sin
+    - day_of_year_cos
+    - weekday   
+
+    e per ora non metterei month, season e day_of_year grezzo.
+    Perché day_of_year_sin e day_of_year_cos già rappresentano bene in che periodo dell’anno siamo, mantenendo anche la ciclicità. weekday invece dà un’informazione diversa: distingue per esempio lunedì, sabato, domenica.
+   
+
+9.  TOPOLOGIA 
+    vedi in fondo è da sistemare / analizzare bene 
+
+
+10. CARATTERISTICHE FISICHE DEL GENERATORE: 
+File: il file YAML 
+    
+    p_min, p_max, p_nom, start cost, stop cost, efficiency, ecc. 
+    
+    Però qui c'è una precisazione importante: se fai un modello separato per ogni generatore, queste caratteristiche sono costanti e quindi non servono a quel modello. Se invece fai un unico modello condiviso tra tutti i generatori, diventano molto utili perché aiutano a distinguere un generatore da un altro. 
+    Esempio 
+        generator   p_max   start_cost   efficiency
+        Tokke_G1     110       135          ...
+        Tokke_G2     110       135          ...
+        Vinje_G1     100       ...          ...
+        Hogga_G1      50       ...          ...
+
+    beh io direi che ne facciamo solo uno per tutti i i generatori 
+
+    A quel punto il modello può imparare cose del tipo:
+    generatori con p_max alto si comportano diversamente da generatori piccoli
+    oppure:
+    generatori con start cost alto tendono ad accendersi meno facilmente
+    oppure:
+    generatori con certe curve di efficienza hanno pattern diversi.
+
+
+11. Head / livello idraulico. Questa sarebbe una feature un po' più avanzata ma secondo me potenzialmente molto buona. Nel YAML ci sono le curve volume → head. Quindi dal volume possiamo stimare il livello dell'acqua:
+reservoir volume
+       ↓
+volume-head curve
+       ↓
+hydraulic head
+
+   L'energia che una turbina può produrre dipende fortemente dal salto idraulico, quindi questo è un modo fisicamente sensato di trasformare il volume.
+
+
+12. Interazioni tra stato del sistema. Per esempio:
+fill_ratio × price
+inflow × fill_ratio
+cumulative_inflow / max_volume
+price - water_value
+volume_margin / max_volume
+
+   Queste permettono al modello di vedere direttamente situazioni come “bacino quasi pieno + molto inflow in arrivo + prezzo elevato”.
+C'è poi una scelta strutturale che secondo me potrebbe migliorare parecchio il progetto. Invece di avere soltanto:
+1 riga = 1 settimana
+2352 target
+migliaia di feature
+
+valuterei seriamente anche una rappresentazione long:
+1 riga =
+1 caso
++ 1 generatore
++ 1 ora
+
+target = ON/OFF
+
+Per esempio:
+case       generator     t     price    fill_ratio   inflow ...   target
+Jan-01     Tokke_G2     37      82         0.71       14.2          1
+Jan-01     Tokke_G2     38      35         0.71       13.9          0
+Jan-01     Hogga_G1     37      82         0.64        8.1          1
+
+Questa forma ha un vantaggio enorme rispetto alla paura che avevi qualche giorno fa: il modello vede esplicitamente il prezzo dell'ora che sta cercando di classificare. Non deve capire che price_t37 corrisponde a Tokke_G2_t37.
+Poi gli puoi comunque dare informazioni sulla settimana futura, per esempio:
+price_current
+price_next_3h_mean
+price_next_12h_max
+price_week_mean
+price_rank_in_week
+
+Questo secondo me è molto più naturale per un classificatore ON/OFF.
+Quindi, se dovessi scegliere le feature che reputo più promettenti, partirei soprattutto da:
+prezzo relativo alla settimana + price-water value + fill ratio + volume margin + inflow cumulativo/anomalia + informazioni dei reservoir a monte + vincoli attivi + temporalità.
+
+
+
+
+E una cosa importante: non dobbiamo creare tutto subito. Nel progetto conviene fare:
+RAW BASELINE
+      ↓
+aggiungiamo feature gruppo per gruppo
+      ↓
+validation score
+      ↓
+teniamo quelle che migliorano
+
+Perché anche una feature che sulla carta sembra intelligente può non aiutare il modello. Questa fase di confronto è proprio parte del feature engineering.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+TOPOLOGIA 
+
+
+Qui l’idea è: non tutti i reservoir sono ugualmente importanti per tutti i generatori.
+    La topologia idraulica dice come sono collegati reservoir, fiumi, tunnel e centrali. Il PDF del task sottolinea proprio che l’acqua rilasciata a monte può influenzare gli impianti a valle, quindi la posizione nella rete conta
+
+Feature della topologia. Questa è secondo me una delle parti più interessanti del vostro progetto. Il PDF dice proprio che l'acqua rilasciata a monte influenza gli impianti a valle.     ML_Task_TDT4173 Invece di dare indiscriminatamente tutti i 17 reservoir a ogni generatore, possiamo costruire feature del tipo:
+   direct_reservoir_volume
+   direct_reservoir_fill_ratio
+   upstream_total_volume
+   upstream_total_inflow
+   upstream_mean_water_value
+   
+   Per esempio, per un generatore di Tokke avremo informazioni relative a Vinjevatn e ai bacini che possono alimentare Vinjevatn a monte. Questa potrebbe essere feature engineering molto più intelligente di una semplice tabellona enorme.
+
+
+Qui l’idea è: **non tutti i reservoir sono ugualmente importanti per tutti i generatori**.
+
+La topologia idraulica dice come sono collegati reservoir, fiumi, tunnel e centrali. Il PDF del task sottolinea proprio che l’acqua rilasciata a monte può influenzare gli impianti a valle, quindi la posizione nella rete conta. ML_Task_TDT4173
+
+Prendiamo un generatore della centrale **Tokke**. Dal file YAML risulta che Tokke è alimentata direttamente da **Vinjevatn**. Quindi, per un generatore di Tokke, alcune feature molto naturali sono quelle relative a Vinjevatn. Tokke_Vinje_topology
+
+Per esempio:
+
+```text
+direct_reservoir_volume
+```
+
+sarebbe semplicemente:
+
+> quanto volume c’è nel reservoir direttamente collegato alla centrale del generatore.
+
+Per Tokke:
+
+```text
+direct_reservoir_volume = volume_Vinjevatn
+```
+
+Poi:
+
+```text
+direct_reservoir_fill_ratio
+```
+
+sarebbe:
+
+```text
+volume_Vinjevatn / max_volume_Vinjevatn
+```
+
+quindi quanto è pieno Vinjevatn in percentuale.
+
+Fin qui stiamo guardando solo il reservoir **direttamente collegato**.
+
+Ma la rete è una cascata. Ci possono essere reservoir più a monte che, tramite fiumi, centrali o tunnel, fanno arrivare acqua a Vinjevatn. Quindi possiamo costruire feature aggregate tipo:
+
+```text
+upstream_total_volume
+```
+
+cioè:
+
+> somma del volume di tutti i reservoir a monte che possono influenzare quel generatore.
+
+Esempio concettuale:
+
+```text
+Reservoir A ─┐
+Reservoir B ─┼→ ... → Vinjevatn → Tokke
+Reservoir C ─┘
+```
+
+allora:
+
+```text
+upstream_total_volume
+= volume_A + volume_B + volume_C
+```
+
+Stessa cosa per:
+
+```text
+upstream_total_inflow
+```
+
+che rappresenta quanta acqua sta entrando complessivamente nei reservoir a monte.
+
+E:
+
+```text
+upstream_mean_water_value
+```
+
+che potrebbe essere la media dei water value dei reservoir a monte.
+
+Il vantaggio è questo. Invece di dire al modello:
+
+```text
+ecco i 17 reservoir, arrangiati
+```
+
+gli stai dando informazioni più strutturate:
+
+```text
+questo è il reservoir direttamente collegato
+questo è quanto è pieno
+questa è quanta acqua c’è complessivamente a monte
+questa è quanta acqua sta arrivando a monte
+questo è il valore economico medio dell’acqua a monte
+```
+
+Quindi stai incorporando nel dataset un po’ di **conoscenza fisica del sistema**.
+
+Per esempio per Tokke potresti avere:
+
+```text
+direct_reservoir_volume
+direct_reservoir_fill_ratio
+upstream_total_volume
+upstream_total_inflow
+upstream_mean_water_value
+```
+
+mentre per Hogga le stesse feature verrebbero calcolate rispetto alla sua parte della rete.
+
+La cosa importante è che **le colonne possono avere lo stesso significato per tutti i generatori**, ma il loro valore cambia in base alla topologia del generatore.
+
+Questo tipo di feature engineering è interessante perché evita di trattare tutti i 17 reservoir come se fossero equivalenti, quando fisicamente non lo sono.
+
+
+
