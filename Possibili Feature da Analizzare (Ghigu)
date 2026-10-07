@@ -55,6 +55,7 @@ File usati: Historical_day_ahead_price e Synthetic_water_value
     - price_minus_water_value = price - water_value
             Ti dice quanto il prezzo dell’elettricità è sopra o sotto il valore dell’acqua.Se è molto positivo, in linea intuitiva può essere conveniente produrre; se è negativo, può essere più conveniente conservare acqua.
 
+    userei questa e non quella sopra probabilmente
     - price_water_value_ratio = price / water_value
             Ti dice quanto il prezzo corrente è grande rispetto al valore dell’acqua.Esempio: prezzo 80, water value 40 → ratio = 2.
 
@@ -92,7 +93,10 @@ File usato: Constrain_min_volume.
     - volume_margin = current_volume - min_volume
     - normalized_volume_margin = (current_volume - min_volume) / max_volume
    
-    approfondire n'attimo con chat sto discorso, perchè i reservoir coinvolti sono solo 3 :/
+    approfondire n'attimo con chat sto discorso, perchè i reservoir coinvolti sono solo 3 
+    
+    chat dice per ora di stare attenti a questa feature qua però perchè 
+    Anche il volume_margin sui vincoli minimi va trattato con attenzione, perché il volume storico è uno stato iniziale giornaliero mentre il vincolo minimo è orario, quindi non è un vero “margine futuro” ora per ora.:/
   
 5. INFLOW AGGREGATO NELLA SETTIMANA
 File usato: Historical_inflow (dal 1958 soccia) 
@@ -110,7 +114,8 @@ File usato: Historical_inflow (dal 1958 soccia)
 
     - inflow_max_week
             il valore massimo osservato nella settimana.
-            
+
+    userei questo e non inflow_mean_week sono la stessa cosa    
     - cumulative_inflow_week
             quanta acqua entra complessivamente durante la settimana.
    
@@ -190,8 +195,56 @@ File usato: Historical_inflow (dal 1958 soccia)
    
 
 9.  TOPOLOGIA 
-    vedi in fondo è da sistemare / analizzare bene 
 
+    Qui l’idea è: non tutti i reservoir sono ugualmente importanti per tutti i generatori. La topologia idraulica dice come sono collegati reservoir, fiumi, tunnel e centrali. Il PDF del task sottolinea proprio che l’acqua rilasciata a monte può influenzare gli impianti a valle, quindi la posizione nella rete conta.
+
+    Reservoir A
+        ↓
+    Reservoir B
+        ↓
+    CENTRALE X
+        ↓
+    Reservoir C
+        ↓
+    CENTRALE Y
+
+    Reservoir B è importantissimo, perché è quello che alimenta direttamente la centrale.
+    Ma anche Reservoir A può essere importante, perché la sua acqua può arrivare a B.
+    Reservoir C, invece, essendo dopo la centrale X, probabilmente è meno direttamente rilevante per decidere se X deve accendersi.
+
+    SECONDO GHIGU QUESTA POTREBBE ESSERE UNA COSA IMPORTANTISSIMA
+    Invece di dare indiscriminatamente tutti i 17 reservoir a ogni generatore, possiamo costruire feature del tipo:
+
+    - direct_total_volume
+            Questo misura il volume d'acqua direttamente collegato alla centrale, quindi per esempio se stiamo analizzando la centrale A il direct volume sarà quello di B. metto total perchè ci potrebbero essere più reservoir collegati a una centrale 
+
+    - direct_mean_fill_ratio
+            dato di prima am diviso il volume totale (mean perchè può coinvolgere più reservoir). io e caht useremmo questo e non il primo perchè diventa ridondante.
+
+    - upstream_total_volume
+            somma del volume di tutti i reservoir che stanno a monte della centrale e che possono, direttamente o indirettamente, contribuire con acqua verso quella centrale.
+
+    - upstream_total_inflow
+            Somma degli inflow dei reservoir upstream, direttamente o indirettamente collegati 
+
+    - upstream_mean_weighted_water_value
+            nel senso, teniamo conto di quanto vale l'acqua nei reservoir che sono collegati alla centrale. ma ovviamente la facciamo pesata rispetto al volume di acqua che i reservoir effettivamente hanno ( idea mia derivata da una idea di chat )
+
+            es: 
+            A: volume = 100   water_value = 30
+            B: volume = 20    water_value = 50
+            C: volume = 10    water_value = 70
+                    
+            La media semplice sarebbe: (30+50+70)/3 = 50
+
+            Ma tratta A, B e C come se fossero ugualmente importanti.
+            Con la media pesata:
+            
+            100*30 + 20*50 + 10*70 / 100 + 20 + 10
+
+            Per esempio, per un generatore di Tokke avremo informazioni relative a Vinjevatn e ai bacini che possono alimentare Vinjevatn a monte. Questa potrebbe essere feature engineering molto più intelligente di una semplice tabellona enorme.
+
+            Qui l’idea è: non tutti i reservoir sono ugualmente importanti per tutti i generatori.
 
 10. CARATTERISTICHE FISICHE DEL GENERATORE: 
 File: il file YAML 
@@ -208,7 +261,7 @@ File: il file YAML
 
     beh io direi che ne facciamo solo uno per tutti i i generatori 
 
-    A quel punto il modello può imparare cose del tipo:
+        A quel punto il modello può imparare cose del tipo:
     generatori con p_max alto si comportano diversamente da generatori piccoli
     oppure:
     generatori con start cost alto tendono ad accendersi meno facilmente
@@ -216,219 +269,139 @@ File: il file YAML
     generatori con certe curve di efficienza hanno pattern diversi.
 
 
-11. Head / livello idraulico. Questa sarebbe una feature un po' più avanzata ma secondo me potenzialmente molto buona. Nel YAML ci sono le curve volume → head. Quindi dal volume possiamo stimare il livello dell'acqua:
-reservoir volume
-       ↓
-volume-head curve
-       ↓
-hydraulic head
+11. SALTO IDRAULICO 
 
-   L'energia che una turbina può produrre dipende fortemente dal salto idraulico, quindi questo è un modo fisicamente sensato di trasformare il volume.
+    Il livello dell’acqua invece è semplicemente l’altezza a cui si trova la superficie dell’acqua rispetto al livello del mare. Se il bacino è più pieno, in genere la superficie dell’acqua è più in alto; se è più vuoto, è più in basso.
+    Esatto: il punto da cui esce l’acqua dal reservoir può anche essere fisso, ma l’altezza della superficie dell’acqua sopra quel punto cambia la pressione disponibile.
+    Immagina un serbatoio con un tubo che parte sempre dallo stesso foro vicino al fondo:
+        superficie acqua
+        ~~~~~~~~~~~~~~~
+        |             |
+        |             |
+        |             |
+        |      ●------|----> tubo → turbina
+        |_____________|
 
+    Il foro ● è sempre nello stesso punto.
+    Se il reservoir è molto pieno, sopra quel foro hai una colonna d’acqua molto alta. Se il reservoir è quasi vuoto, sopra il foro hai una colonna d’acqua più bassa.
+    E quella colonna d’acqua crea pressione.
+    Quindi:
+    reservoir molto pieno
+    → tanta acqua sopra il tubo
+    → maggiore pressione
+    → maggiore energia disponibile
 
-12. Interazioni tra stato del sistema. Per esempio:
-fill_ratio × price
-inflow × fill_ratio
-cumulative_inflow / max_volume
-price - water_value
-volume_margin / max_volume
+    La feature da aggiungere quindi sono 
+    
+    - Reservoir_level
+        sarebbe l'altezza dell'acqua totale di un reseroir rispetto al livello del mare. nel file Yaml è presente una "curva-volume" che dice "se nel reservoir ci sono X milioni di m³, allora la superficie dell’acqua si trova a quota Y metri sul livello del mare”.
 
-   Queste permettono al modello di vedere direttamente situazioni come “bacino quasi pieno + molto inflow in arrivo + prezzo elevato”.
-C'è poi una scelta strutturale che secondo me potrebbe migliorare parecchio il progetto. Invece di avere soltanto:
-1 riga = 1 settimana
-2352 target
-migliaia di feature
+    - estimated_hydraulic_head
+        Questa feature prova ad avvicinarsi al salto idraulico
+        livello reservoir = 934 m
+        livello valle della centrale = 700 m
+        hydraulic head ≈ 234 m
+        Quello rappresenta molto meglio “da quanto in alto cade l’acqua” attraversando la turbina.
 
-valuterei seriamente anche una rappresentazione long:
-1 riga =
-1 caso
-+ 1 generatore
-+ 1 ora
-
-target = ON/OFF
-
-Per esempio:
-case       generator     t     price    fill_ratio   inflow ...   target
-Jan-01     Tokke_G2     37      82         0.71       14.2          1
-Jan-01     Tokke_G2     38      35         0.71       13.9          0
-Jan-01     Hogga_G1     37      82         0.64        8.1          1
-
-Questa forma ha un vantaggio enorme rispetto alla paura che avevi qualche giorno fa: il modello vede esplicitamente il prezzo dell'ora che sta cercando di classificare. Non deve capire che price_t37 corrisponde a Tokke_G2_t37.
-Poi gli puoi comunque dare informazioni sulla settimana futura, per esempio:
-price_current
-price_next_3h_mean
-price_next_12h_max
-price_week_mean
-price_rank_in_week
-
-Questo secondo me è molto più naturale per un classificatore ON/OFF.
-Quindi, se dovessi scegliere le feature che reputo più promettenti, partirei soprattutto da:
-prezzo relativo alla settimana + price-water value + fill ratio + volume margin + inflow cumulativo/anomalia + informazioni dei reservoir a monte + vincoli attivi + temporalità.
+    chat darebbe più priorità alla seconda 
 
 
+12. INTERAZIONI TRA STATO DEL sistema
 
+    Per esempio:
+        - fill_ratio × price
+            
+        - inflow × fill_ratio
 
-E una cosa importante: non dobbiamo creare tutto subito. Nel progetto conviene fare:
-RAW BASELINE
-      ↓
-aggiungiamo feature gruppo per gruppo
-      ↓
-validation score
-      ↓
-teniamo quelle che migliorano
+        - cumulative_inflow / max_volume
 
-Perché anche una feature che sulla carta sembra intelligente può non aiutare il modello. Questa fase di confronto è proprio parte del feature engineering.
+        - price - water_value
 
+        - volume_margin / max_volume
 
+    Queste interazioni possono aiutare perché il modello non deve sempre “inventarsi da solo” la relazione tra due colonne.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-TOPOLOGIA 
-
-
-Qui l’idea è: non tutti i reservoir sono ugualmente importanti per tutti i generatori.
-    La topologia idraulica dice come sono collegati reservoir, fiumi, tunnel e centrali. Il PDF del task sottolinea proprio che l’acqua rilasciata a monte può influenzare gli impianti a valle, quindi la posizione nella rete conta
-
-Feature della topologia. Questa è secondo me una delle parti più interessanti del vostro progetto. Il PDF dice proprio che l'acqua rilasciata a monte influenza gli impianti a valle.     ML_Task_TDT4173 Invece di dare indiscriminatamente tutti i 17 reservoir a ogni generatore, possiamo costruire feature del tipo:
-   direct_reservoir_volume
-   direct_reservoir_fill_ratio
-   upstream_total_volume
-   upstream_total_inflow
-   upstream_mean_water_value
    
-   Per esempio, per un generatore di Tokke avremo informazioni relative a Vinjevatn e ai bacini che possono alimentare Vinjevatn a monte. Questa potrebbe essere feature engineering molto più intelligente di una semplice tabellona enorme.
+   
 
 
-Qui l’idea è: **non tutti i reservoir sono ugualmente importanti per tutti i generatori**.
+ALTRE NOTE IMPORTANTI 
 
-La topologia idraulica dice come sono collegati reservoir, fiumi, tunnel e centrali. Il PDF del task sottolinea proprio che l’acqua rilasciata a monte può influenzare gli impianti a valle, quindi la posizione nella rete conta. ML_Task_TDT4173
+    1)
+     C'è poi una scelta strutturale che secondo me potrebbe migliorare parecchio il progetto. Invece di avere soltanto:
+    1 riga = 1 settimana, 2352 target e migliaia di feature valuterei seriamente anche una rappresentazione long:   
+    1 riga = 1 caso + 1 generatore + 1 ora
 
-Prendiamo un generatore della centrale **Tokke**. Dal file YAML risulta che Tokke è alimentata direttamente da **Vinjevatn**. Quindi, per un generatore di Tokke, alcune feature molto naturali sono quelle relative a Vinjevatn. Tokke_Vinje_topology
+    Il problema è che anche le feature temporali diventano gigantesche:
+    price_t0
+    price_t1
+    ...
+    price_t167
 
-Per esempio:
+    e il modello deve imparare autonomamente che Tokke_G2_t37 ha una relazione particolarmente forte con price_t37 e non con price_t130.
 
-```text
-direct_reservoir_volume
-```
+    L'alternativa è “srotolare” il dataset.
 
-sarebbe semplicemente:
+    1 riga = 1 generatore in 1 ora di 1 settimana
 
-> quanto volume c’è nel reservoir direttamente collegato alla centrale del generatore.
+    Per esempio una sola settimana genererebbe: 14 * 168 = 2352 righe.
+        
+    Avresti qualcosa del genere:
+    case      generator   hour   price   fill_ratio   inflow   target
+    Jan-01    Tokke_G2     37      82       0.71       14.2      1
+    Jan-01    Tokke_G2     38      35       0.71       13.9      0
+    Jan-01    Hogga_G1     37      82       0.64        8.1      1
 
-Per Tokke:
+    Qui il target è uno solo: target = ON oppure OFF
+    Questo rende molto più naturale associare le feature.
+    Per esempio:
 
-```text
-direct_reservoir_volume = volume_Vinjevatn
-```
+    price_current = prezzo dell'ora 37
+    inflow_current = inflow dell'ora 37
+    fill_ratio = stato del reservoir associato al generatore
+    water_value = valore dell'acqua rilevante
+    hour = 37
+    generator = Tokke_G2
 
-Poi:
+    Quindi non devi più avere:
+    price_t0
+    price_t1
+    ...
+    price_t167
 
-```text
-direct_reservoir_fill_ratio
-```
 
-sarebbe:
+    Questa forma ha un vantaggio enorme rispetto alla paura che avevi qualche giorno fa: il modello vede esplicitamente il prezzo dell'ora che sta cercando di classificare. Non deve capire che price_t37 corrisponde a Tokke_G2_t37.
+    Poi gli puoi comunque dare informazioni sulla settimana futura, per esempio:
+    price_current
+    price_next_3h_mean
+    price_next_12h_max
+    price_week_mean
+    price_rank_in_week
 
-```text
-volume_Vinjevatn / max_volume_Vinjevatn
-```
+    Inoltre, con la forma long, le feature fisiche del generatore diventano utili:
+    p_max
+    p_min
+    start_cost
+    efficiency
 
-quindi quanto è pieno Vinjevatn in percentuale.
+    Questo secondo me è molto più naturale per un classificatore ON/OFF.
+    Quindi, se dovessi scegliere le feature che reputo più promettenti, partirei soprattutto da:
+    prezzo relativo alla settimana + price-water value + fill ratio + volume margin + inflow cumulativo/anomalia + informazioni dei reservoir a monte + vincoli attivi + temporalità.
 
-Fin qui stiamo guardando solo il reservoir **direttamente collegato**.
+    Tuttavia comporterà circa 6,9 milioni di righe sul training completo, quindi dovremo costruirlo con un po’ di attenzione alla memoria e ai tipi dei dati.
 
-Ma la rete è una cascata. Ci possono essere reservoir più a monte che, tramite fiumi, centrali o tunnel, fanno arrivare acqua a Vinjevatn. Quindi possiamo costruire feature aggregate tipo:
 
-```text
-upstream_total_volume
-```
+    2)
+    E una cosa importante: non dobbiamo creare tutto subito. Nel progetto conviene fare:
+    RAW BASELINE
+        ↓
+    aggiungiamo feature gruppo per gruppo
+        ↓
+    validation score
+        ↓
+    teniamo quelle che migliorano
 
-cioè:
-
-> somma del volume di tutti i reservoir a monte che possono influenzare quel generatore.
-
-Esempio concettuale:
-
-```text
-Reservoir A ─┐
-Reservoir B ─┼→ ... → Vinjevatn → Tokke
-Reservoir C ─┘
-```
-
-allora:
-
-```text
-upstream_total_volume
-= volume_A + volume_B + volume_C
-```
-
-Stessa cosa per:
-
-```text
-upstream_total_inflow
-```
-
-che rappresenta quanta acqua sta entrando complessivamente nei reservoir a monte.
-
-E:
-
-```text
-upstream_mean_water_value
-```
-
-che potrebbe essere la media dei water value dei reservoir a monte.
-
-Il vantaggio è questo. Invece di dire al modello:
-
-```text
-ecco i 17 reservoir, arrangiati
-```
-
-gli stai dando informazioni più strutturate:
-
-```text
-questo è il reservoir direttamente collegato
-questo è quanto è pieno
-questa è quanta acqua c’è complessivamente a monte
-questa è quanta acqua sta arrivando a monte
-questo è il valore economico medio dell’acqua a monte
-```
-
-Quindi stai incorporando nel dataset un po’ di **conoscenza fisica del sistema**.
-
-Per esempio per Tokke potresti avere:
-
-```text
-direct_reservoir_volume
-direct_reservoir_fill_ratio
-upstream_total_volume
-upstream_total_inflow
-upstream_mean_water_value
-```
-
-mentre per Hogga le stesse feature verrebbero calcolate rispetto alla sua parte della rete.
-
-La cosa importante è che **le colonne possono avere lo stesso significato per tutti i generatori**, ma il loro valore cambia in base alla topologia del generatore.
-
-Questo tipo di feature engineering è interessante perché evita di trattare tutti i 17 reservoir come se fossero equivalenti, quando fisicamente non lo sono.
+    Perché anche una feature che sulla carta sembra intelligente può non aiutare il modello. Questa fase di confronto è proprio parte del feature engineering.
 
 
 
