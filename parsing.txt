@@ -1,0 +1,242 @@
+Based on the provided documents and the sample submission, here is a structured analysis of the machine learning task, the most relevant features, what you should create, and an EDA plan.
+
+---
+
+## 1. Task Understanding
+
+- **Goal**: Predict the probability (0–1) that each generating unit is ON for each hour of a one‑week scheduling case.
+- **System**: Tokke‑Vinje hydropower system (17 reservoirs, 9 plants, 14 generating units, ~1000 MW).
+- **Cases**: 3,647 daily rolling‑horizon cases from 2015‑01‑01 to 2024‑12‑25. Each case covers 168 hours.
+- **Training data**: `Unit commitment decisions.csv` contains `Run No`, `starttime`, `total calculation time`, and ground‑truth ON/OFF for each unit‑hour.
+- **Test data**: `sample_submission.csv` shows the required output format: `Run No` + 14 units × 168 hours = 2,353 columns. Predictions must be probabilities.
+- **Metric**: ROC‑AUC (micro average) across all unit‑hour predictions.
+
+---
+
+## 2. Most Relevant Features
+
+The core inputs are **price**, **inflow**, **storage**, and **water value**. The optional inputs (constraints, topology, configuration) are highly valuable when converted into features.
+
+### 2.1 Core Time‑Series Features
+| Feature | Why it matters | Suggested transformations |
+|--------|----------------|---------------------------|
+| **Day‑ahead price** | Directly drives profitability. High price → turn units ON. | Current price, lag (t‑1, t‑24), rolling mean/std (24h, 72h, 168h), price rank within week, price difference from water value. |
+| **Reservoir inflow** | Determines available water. High inflow may allow more generation. | Current inflow per reservoir, rolling sum (24h, 72h), lag (t‑1, t‑24), inflow relative to capacity. |
+| **Reservoir storage** | Water inventory. High storage → more flexibility; low storage → conserve. | Current storage (daily, forward‑filled), % of max capacity, deviation from min volume, storage change over past day/week. |
+| **Water value** | Opportunity cost of using water now vs. later. If price > water value, generate. | Current water value per reservoir, price – water value spread, water value change, rolling mean. |
+
+### 2.2 Constraint Features
+| Feature | Why it matters | Suggested transformations |
+|--------|----------------|---------------------------|
+| **Min reservoir volume** | Forces release if storage near minimum. | Binary flag (constraint active), actual min value, storage – min. |
+| **Min river flow** | May force upstream units to run to satisfy downstream flow. | Binary flag, actual min flow, upstream inflow vs. min flow. |
+
+### 2.3 Topology & Configuration Features
+Derive from `Tokke_Vinje_topology.yaml` and `Tokke_topology.pdf`:
+- **Unit‑to‑plant mapping**: Plant name, unit index, capacity, efficiency, min/max generation, start‑up cost.
+- **Reservoir‑to‑plant connections**: Which reservoirs feed each plant.
+- **Upstream/downstream relationships**: For each unit, aggregate features from upstream reservoirs (total inflow, total storage, average water value) and downstream constraints (min flow requirements, downstream units).
+- **Number of downstream units** or **total downstream capacity**: Indicates how much water must be passed through.
+
+### 2.4 Temporal Features
+- Hour of day (0–23), day of week (0–6), month, is weekend, is holiday.
+- Position within the case `t` (0–167).
+- Cyclical encodings (sin/cos) for hour and day of week.
+
+### 2.5 Unit‑Specific Lagged Features
+- Previous ON/OFF state (if available in training, but not in test). Instead, use lagged input features (e.g., price at t‑1, inflow at t‑1).
+- Rolling statistics of inputs over the past 24h, 72h, 168h.
+
+---
+
+## 3. What You Should Create
+
+### 3.1 Data Pipeline
+1. **Parse `starttime`** and generate a timestamp for each `t` (0–167) for every case.
+2. **Merge all datasets** on timestamp:
+   - Price (hourly)
+   - Inflow (hourly, per reservoir + river)
+   - Min volume (hourly, per reservoir)
+   - Min flow (hourly, per river)
+   - Storage (daily → forward‑fill to hourly)
+   - Water value (daily → forward‑fill to hourly)
+3. **Reshape to long format**: one row per `(Run No, unit, t)` with features and target (0/1). This makes EDA and modeling easier.
+4. **Add static unit metadata** from YAML: capacity, plant, connected reservoirs, etc.
+5. **Create aggregated features** per unit: e.g., sum of inflow from all upstream reservoirs, average water value of connected reservoirs, downstream min flow requirement.
+
+### 3.2 Feature Engineering Ideas
+- **Price‑water value spread**: `price - water_value` for the unit’s main reservoir.
+- **Storage ratio**: `storage / max_volume` for each reservoir.
+- **Inflow‑to‑storage ratio**: `inflow / storage`.
+- **Rolling windows**: For each key variable (price, inflow, water value), compute mean, max, min, std over past 24h, 72h, 168h.
+- **Lags**: t‑1, t‑2, t‑24, t‑168 for price, inflow, water value.
+- **Constraint flags**: 1 if min volume/flow > 0.
+- **Topology aggregates**: For each unit, total upstream inflow, total upstream storage, average water value of upstream reservoirs, downstream min flow sum.
+- **Interactions**: price × inflow, price × storage, price × (1/water_value).
+
+### 3.3 Modeling Approach
+- **Baseline**: Historical ON probability per unit per hour‑of‑week (e.g., for each unit and each of 168 hours, compute average ON rate from training).
+- **Classical models**: Logistic Regression, Random Forest, XGBoost/LightGBM. Train one global model with `unit` as a categorical feature, or separate model per unit.
+- **Sequence models**: LSTM/GRU/Transformer that take the 168‑hour sequence of features and output 168 probabilities for each unit. This captures temporal dependencies.
+- **Evaluation**: Use ROC‑AUC (micro average). Ensure probabilities are well‑calibrated.
+
+---
+
+## 4. EDA Plan (with Code Templates)
+
+Since I don’t have the actual data files, here is a step‑by‑step EDA you should run. The code assumes you have loaded the CSV files into pandas DataFrames.
+
+### 4.1 Load and Inspect
+```python
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+price = pd.read_csv('Historical_day_ahead_price_2015_2025.csv', parse_dates=['date'])
+inflow = pd.read_csv('Historical_inflow_1958_2025.csv', parse_dates=['date'])
+storage = pd.read_csv('Historical_volume_2015_2024.csv', parse_dates=['date'])
+water_value = pd.read_csv('Synthetic water value 2015_2024.csv', parse_dates=['date'])
+min_vol = pd.read_csv('Constraint min volume.csv', parse_dates=['date'])
+min_flow = pd.read_csv('Constraint min flow.csv', parse_dates=['date'])
+uc = pd.read_csv('Unit commitment decisions.csv', parse_dates=['starttime'])
+
+print(price.shape, inflow.shape, storage.shape, water_value.shape, min_vol.shape, min_flow.shape, uc.shape)
+print(price.head())
+print(uc.head())
+```
+
+### 4.2 Check Missing Values and Date Ranges
+```python
+for df, name in zip([price, inflow, storage, water_value, min_vol, min_flow, uc], 
+                    ['price', 'inflow', 'storage', 'water_value', 'min_vol', 'min_flow', 'uc']):
+    print(f"{name}: {df['date'].min()} to {df['date'].max()}, missing: {df.isnull().sum().sum()}")
+```
+
+### 4.3 Reshape UC to Long Format
+```python
+# UC columns: result_committed_{Plant}_{Unit}_t{Hour}
+uc_long = uc.melt(id_vars=['Run No', 'starttime'], 
+                  var_name='unit_hour', value_name='target')
+uc_long[['plant_unit', 't']] = uc_long['unit_hour'].str.extract(r'result_committed_(.+)_t(\d+)')
+uc_long['t'] = uc_long['t'].astype(int)
+uc_long['unit'] = uc_long['plant_unit'].str.replace('_G', '_G')  # adjust as needed
+print(uc_long.head())
+```
+
+### 4.4 Merge Features for a Sample Case
+```python
+# Pick one Run No
+sample_run = uc_long['Run No'].iloc[0]
+sample_start = uc[sample_run == uc['Run No']]['starttime'].iloc[0]
+sample_uc = uc_long[uc_long['Run No'] == sample_run].copy()
+sample_uc['timestamp'] = sample_start + pd.to_timedelta(sample_uc['t'], unit='h')
+
+# Merge price
+sample_uc = sample_uc.merge(price, left_on='timestamp', right_on='date', how='left')
+# Merge inflow (need to melt inflow first)
+inflow_long = inflow.melt(id_vars=['date'], var_name='reservoir', value_name='inflow')
+sample_uc = sample_uc.merge(inflow_long, left_on='timestamp', right_on='date', how='left')
+# Similarly for other features...
+```
+
+### 4.5 Target Distribution (Class Balance)
+```python
+# Overall ON rate per unit
+on_rate = uc_long.groupby('plant_unit')['target'].mean().sort_values()
+print(on_rate)
+
+# Plot
+plt.figure(figsize=(12,6))
+on_rate.plot(kind='bar')
+plt.title('ON rate per generating unit')
+plt.ylabel('Proportion ON')
+plt.show()
+```
+
+### 4.6 Time Patterns
+```python
+# ON rate by hour of day
+uc_long['hour'] = uc_long['timestamp'].dt.hour
+hourly_on = uc_long.groupby(['plant_unit', 'hour'])['target'].mean().unstack(0)
+hourly_on.plot(figsize=(12,6))
+plt.title('ON rate by hour of day')
+plt.show()
+
+# ON rate by day of week
+uc_long['dow'] = uc_long['timestamp'].dt.dayofweek
+dow_on = uc_long.groupby(['plant_unit', 'dow'])['target'].mean().unstack(0)
+dow_on.plot(figsize=(12,6))
+plt.title('ON rate by day of week')
+plt.show()
+```
+
+### 4.7 Feature vs Target Relationships
+```python
+# Boxplot of price when unit is ON vs OFF (for one unit)
+unit_name = 'Hogga_G1'
+unit_data = uc_long[uc_long['plant_unit'] == unit_name]
+plt.figure(figsize=(8,5))
+sns.boxplot(x='target', y='price', data=unit_data)
+plt.title(f'Price distribution for {unit_name} (0=OFF, 1=ON)')
+plt.show()
+
+# Water value spread
+unit_data['price_water_spread'] = unit_data['price'] - unit_data['water_value']  # assuming merged
+sns.boxplot(x='target', y='price_water_spread', data=unit_data)
+plt.title(f'Price - Water Value for {unit_name}')
+plt.show()
+```
+
+### 4.8 Constraint Analysis
+```python
+# How often are min volume constraints active?
+min_vol_long = min_vol.melt(id_vars=['date'], var_name='reservoir', value_name='min_volume')
+active_min_vol = min_vol_long[min_vol_long['min_volume'] > 0]
+print(active_min_vol.groupby('reservoir').size())
+
+# Min flow constraints
+min_flow_long = min_flow.melt(id_vars=['date'], var_name='river', value_name='min_flow')
+active_min_flow = min_flow_long[min_flow_long['min_flow'] > 0]
+print(active_min_flow.groupby('river').size())
+```
+
+### 4.9 Correlation Matrix
+```python
+# For a single unit, compute correlation of features with target
+features = ['price', 'inflow', 'storage', 'water_value', 'min_volume', 'min_flow']
+corr = unit_data[features + ['target']].corr()
+plt.figure(figsize=(8,6))
+sns.heatmap(corr, annot=True, cmap='coolwarm')
+plt.title(f'Feature correlation for {unit_name}')
+plt.show()
+```
+
+### 4.10 Feature Importance (Quick Model)
+```python
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+# Prepare data for one unit
+X = unit_data[features]
+y = unit_data['target']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+rf.fit(X_train, y_train)
+
+importances = pd.Series(rf.feature_importances_, index=features).sort_values(ascending=False)
+print(importances)
+```
+
+---
+
+## 5. Key Takeaways
+
+- **Most relevant features**: Price, water value spread, storage level (relative to min/max), inflow, and constraint flags. Topology‑derived aggregates (upstream inflow/storage, downstream min flow) are also powerful.
+- **What to create**: A long‑format dataset `(Run No, unit, t, timestamp, features, target)`. Engineer lag/rolling features, interactions, and unit‑specific aggregates.
+- **EDA focus**: Class balance, temporal patterns, feature‑target relationships, constraint activity, and feature importance. Use visualizations to understand which features drive UC decisions.
+- **Modeling**: Start with a global XGBoost/LightGBM model with `unit` as a categorical feature. Then try sequence models (LSTM/Transformer) for temporal dependencies. Evaluate with micro‑averaged ROC‑AUC.
+
+This roadmap will help you build a strong predictive model for the Tokke‑Vinje unit commitment task.
