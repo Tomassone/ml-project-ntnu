@@ -16,4 +16,6 @@ xgboost
 jupyterlab
 ipykernel
 
+# dynamic output
 tqdm
+ipywidgets

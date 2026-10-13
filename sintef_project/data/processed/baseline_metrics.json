@@ -1,0 +1,12 @@
+{
+  "roc_auc_micro": 0.752861838404255,
+  "accuracy_at_0_5": 0.7448274608988895,
+  "precision_at_0_5": 0.6622784040476972,
+  "recall_at_0_5": 0.5183888362448106,
+  "f1_at_0_5": 0.5815656087134254,
+  "n_train_rows": 5496624,
+  "n_test_rows": 1375920,
+  "n_train_cases": 2337,
+  "n_test_cases": 585,
+  "training_seconds": 26.88
+}
