@@ -32,3 +32,18 @@ direct_mean_water_value — Water value medio dei reservoir diretti, pesato sui 
 upstream_total_volume — Volume iniziale totale dei reservoir a monte, inclusi quelli diretti
 upstream_total_inflow — Somma degli afflussi nei reservoir a monte nell'ora corrente
 upstream_mean_water_value — Water value medio dei reservoir a monte, pesato sui volumi
+ù
+
+
+
+
+
+
+jupyter nbconvert \
+    --to notebook \
+    --execute "01_build_feature_table.ipynb" \
+    --output "tmp/01_build_feature_table_executed.ipynb" \
+    --ExecutePreprocessor.timeout=-1
+
+
+

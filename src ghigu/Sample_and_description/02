@@ -1,3 +1,10 @@
+mkdir -p tmp
+
+jupyter nbconvert \
+    --to notebook \
+    --execute "02_create_baseline_model.ipynb" \
+    --output "tmp/02_create_baseline_model_executed.ipynb" \
+    --ExecutePreprocessor.timeout=-1
 
 no tuning,
 split 80% e 20% fatto a caso

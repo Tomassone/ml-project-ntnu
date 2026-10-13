@@ -15,3 +15,5 @@ xgboost
 # Notebook environment
 jupyterlab
 ipykernel
+
+tqdm
