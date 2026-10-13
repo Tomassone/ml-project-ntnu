@@ -1,0 +1,6 @@
+
+no tuning,
+split 80% e 20% fatto a caso
+inoltre alcune feature derivano da 
+valori idrici relativi a ore future. Per una valutazione rigorosa 
+controlleremo la disponibilità delle feature all'inferenza e introdurremo uno split temporale 

@@ -1,0 +1,34 @@
+run_no — Identificativo del caso di simulazione
+starttime — Data e ora di inizio della simulazione
+hour — Ora della simulazione (0–167)
+timestamp — Data e ora effettiva della riga
+generator — Nome del generatore
+plant — Centrale a cui appartiene il generatore
+price_current — Prezzo dell'energia nell'ora corrente (€/MWh)
+p_min — Potenza minima del generatore
+p_max — Potenza massima del generatore
+p_nom — Potenza nominale del generatore
+start_cost — Costo di avviamento del generatore
+stop_cost — Costo di spegnimento del generatore
+penstock — Identificativo della condotta forzata
+min_volume_Totak — Volume minimo consentito nel reservoir Totak
+min_volume_Byrtevatn — Volume minimo consentito nel reservoir Byrtevatn
+min_volume_Staavatn — Volume minimo consentito nel reservoir Staavatn
+min_flow_b_Kjelavatn — Flusso minimo richiesto a Kjelavatn
+min_flow_b_Hyljelihyl — Flusso minimo richiesto a Hyljelihyl
+min_flow_b_Vinjevatn — Flusso minimo richiesto a Vinjevatn
+min_flow_b_Byrtevatn — Flusso minimo richiesto a Byrtevatn
+min_flow_b_Bandak — Flusso minimo richiesto a Bandak
+min_flow_r_Vest_Vassdraget — Flusso minimo richiesto nel corso d'acqua Vest_Vassdraget
+inflow_r_Vest_Vassdraget — Afflusso naturale nel corso d'acqua Vest_Vassdraget
+target — Stato del generatore (1 = ON, 0 = OFF)
+
+--- FEATURE AGGIUNTE DA NOI ---
+
+direct_total_volume — Volume iniziale totale dei reservoir direttamente collegati
+direct_mean_fill_ratio — Percentuale complessiva di riempimento dei reservoir diretti
+direct_total_inflow — Somma degli afflussi nei reservoir diretti nell'ora corrente
+direct_mean_water_value — Water value medio dei reservoir diretti, pesato sui volumi
+upstream_total_volume — Volume iniziale totale dei reservoir a monte, inclusi quelli diretti
+upstream_total_inflow — Somma degli afflussi nei reservoir a monte nell'ora corrente
+upstream_mean_water_value — Water value medio dei reservoir a monte, pesato sui volumi

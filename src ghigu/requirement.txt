@@ -1,10 +1,17 @@
-
+# Data loading and feature engineering
 numpy
 pandas
 PyYAML
 pyarrow
+
+# Exploratory data analysis and plotting
 matplotlib
 seaborn
+
+# Machine learning and evaluation
 scikit-learn
+xgboost
+
+# Notebook environment
 jupyterlab
 ipykernel
