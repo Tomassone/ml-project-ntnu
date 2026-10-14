@@ -21,6 +21,30 @@ File usato: Historical_day_ahead_price.csv
     - price_max
             prezzo massimo della settimana
 
+
+    - price_diff_week_mean
+            differenza rispetto alla media settimanale 
+
+    - price_rank_week
+            ranking del prezzo nell'arco della settimana rank_t
+            Il ranking del prezzo nella settimana dice semplicemente quanto è alto o basso il prezzo di una certa ora rispetto agli altri 167 prezzi della stessa settimana.
+            Esempio: hai 168 prezzi settimanali e, dopo averli ordinati dal più basso al più alto, il prezzo di t37 risulta essere il 150°.
+
+    - price_delta_prev_hour
+            variazione rispetto all'ora precedente  price_t - price_t-1 quella
+
+    - price_mean_next_3h
+            media delle prossime 3 ore. 
+
+    - price_mean_next_12h
+            media delle prossime 12 ore. 
+                
+
+     NON PROVATE
+    - price_ratio_week_mean
+            prezzo di quell'ora diviso prezzo della settimana. ti dice quanto è sopra o sotto il prezzo settimanale
+
+ 
     - quantili 
             I quantili servono a descrivere meglio come sono distribuiti i 168 prezzi della settimana.
             q25: il 25% dei prezzi della settimana è sotto questo valore
@@ -28,24 +52,8 @@ File usato: Historical_day_ahead_price.csv
             q75: il 75% dei prezzi è sotto questo valore
             robe del genere 
 
-    - differenza rispetto alla media settimanale
-            quella
-
-    - ranking del prezzo nell'arco della settimana rank_t
-            Il ranking del prezzo nella settimana dice semplicemente quanto è alto o basso il prezzo di una certa ora rispetto agli altri 167 prezzi della stessa settimana.
-            Esempio: hai 168 prezzi settimanali e, dopo averli ordinati dal più basso al più alto, il prezzo di t37 risulta essere il 150°.
-
-    - variazione rispetto all'ora precedente  price_t - price_t-1
-            quella
-
-    - media delle prossime 3/6/12 ore. 
-            quella
-
-    - price_t / price_mean_week
-            prezzo di quell'ora diviso prezzo della settimana. ti dice quanto è sopra o sotto il prezzo settimanale
-
-    - price_t - mean_price_week
-            può essere molto utile: 80 €/MWh significa una cosa diversa in una settimana in cui la media è 30 rispetto a una settimana in cui la media è 100.
+    - media delle prossime 6 ore. 
+            
 
 2. PREZZO ACQUA E ELETTRICITA'
 File usati: Historical_day_ahead_price e Synthetic_water_value
@@ -84,6 +92,24 @@ File usato: Historical_volume
     bravo chat questo sembra utile per davvero 
     
 
+
+
+
+
+
+
+
+
+
+NON USATA ANCORA MA FORSE IN FUTURO 
+
+
+
+
+
+
+
+
 4. MARGINE RISPETTO AI VINCOLI MINIMI. 
 File usato: Constrain_min_volume.
     
@@ -98,8 +124,14 @@ File usato: Constrain_min_volume.
     chat dice per ora di stare attenti a questa feature qua però perchè 
     Anche il volume_margin sui vincoli minimi va trattato con attenzione, perché il volume storico è uno stato iniziale giornaliero mentre il vincolo minimo è orario, quindi non è un vero “margine futuro” ora per ora.:/
   
+
+
+
+
+queste fanno tutte merda, peggiorano e basta 
+
 5. INFLOW AGGREGATO NELLA SETTIMANA
-File usato: Historical_inflow (dal 1958 soccia) 
+File usato: Historical_inflow (dal 1958 ) 
 
     Per una settimana abbiamo quindi 168 valori per ogni reservoir. Invece di dare al modello solo tutti i 168 valori grezzi, possiamo anche riassumere quella settimana con alcune feature.
 
@@ -120,6 +152,23 @@ File usato: Historical_inflow (dal 1958 soccia)
             quanta acqua entra complessivamente durante la settimana.
    
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 6. INFLOW RISPETTO ALLA NORMALITA' STORICA: 
 
     Qui l’idea è usare i dati molto vecchi, dal 1958 in poi, per capire se l’inflow attuale è normale o anomalo per quel periodo dell’anno.
@@ -132,6 +181,22 @@ File usato: Historical_inflow (dal 1958 soccia)
     - inflow_ratio = current_inflow / historical_mean
    
     Quindi il modello può distinguere “20 m³/s” da “20 m³/s durante un periodo in cui normalmente ce ne sono 5”.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 7. VINCOLI MINIMI DI INFLOW 
