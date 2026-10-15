@@ -152,23 +152,6 @@ File usato: Historical_inflow (dal 1958 )
             quanta acqua entra complessivamente durante la settimana.
    
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 6. INFLOW RISPETTO ALLA NORMALITA' STORICA: 
 
     Qui l’idea è usare i dati molto vecchi, dal 1958 in poi, per capire se l’inflow attuale è normale o anomalo per quel periodo dell’anno.
@@ -181,22 +164,6 @@ File usato: Historical_inflow (dal 1958 )
     - inflow_ratio = current_inflow / historical_mean
    
     Quindi il modello può distinguere “20 m³/s” da “20 m³/s durante un periodo in cui normalmente ce ne sono 5”.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 7. VINCOLI MINIMI DI INFLOW 
@@ -213,6 +180,7 @@ File usato: Historical_inflow (dal 1958 )
     - max_min_flow_week
    
    Il semplice flag constraint_active potrebbe già essere utile.
+
 
 8. FEATURE TEMPORALI
     L’idea è questa: da starttime possiamo estrarre informazioni temporali utili, perché il comportamento del sistema cambia molto durante l’anno.
@@ -258,6 +226,10 @@ File usato: Historical_inflow (dal 1958 )
     e per ora non metterei month, season e day_of_year grezzo.
     Perché day_of_year_sin e day_of_year_cos già rappresentano bene in che periodo dell’anno siamo, mantenendo anche la ciclicità. weekday invece dà un’informazione diversa: distingue per esempio lunedì, sabato, domenica.
    
+
+
+
+
 
 9.  TOPOLOGIA 
 
@@ -310,6 +282,14 @@ File usato: Historical_inflow (dal 1958 )
             Per esempio, per un generatore di Tokke avremo informazioni relative a Vinjevatn e ai bacini che possono alimentare Vinjevatn a monte. Questa potrebbe essere feature engineering molto più intelligente di una semplice tabellona enorme.
 
             Qui l’idea è: non tutti i reservoir sono ugualmente importanti per tutti i generatori.
+
+
+
+
+
+
+
+
 
 10. CARATTERISTICHE FISICHE DEL GENERATORE: 
 File: il file YAML 
