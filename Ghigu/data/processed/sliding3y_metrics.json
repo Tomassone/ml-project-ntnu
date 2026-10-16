@@ -9,11 +9,11 @@
   "cv_folds": [
     {
       "validation_year": 2019,
-      "roc_auc_micro": 0.936992521181016,
-      "accuracy_at_0_5": 0.8355444545506224,
-      "precision_at_0_5": 0.7923310059232389,
-      "recall_at_0_5": 0.9223727698645071,
-      "f1_at_0_5": 0.8524207561707894,
+      "roc_auc_micro": 0.9654750290754526,
+      "accuracy_at_0_5": 0.8967049911886761,
+      "precision_at_0_5": 0.8811844702785698,
+      "recall_at_0_5": 0.9239827684155084,
+      "f1_at_0_5": 0.9020762718048958,
       "n_train_cases": 1090,
       "n_validation_cases": 359,
       "n_train_rows": 2563680,
@@ -24,15 +24,15 @@
       "train_end": "2018-12-25T00:00:00+00:00",
       "validation_start": "2019-01-01T00:00:00+00:00",
       "validation_end": "2019-12-25T00:00:00+00:00",
-      "training_seconds": 14.27
+      "training_seconds": 15.76
     },
     {
       "validation_year": 2020,
-      "roc_auc_micro": 0.8864478381973186,
-      "accuracy_at_0_5": 0.7537438586545729,
-      "precision_at_0_5": 0.7230825863743162,
-      "recall_at_0_5": 0.9488880451183123,
-      "f1_at_0_5": 0.8207374088039933,
+      "roc_auc_micro": 0.8952768484805038,
+      "accuracy_at_0_5": 0.7187511810279668,
+      "precision_at_0_5": 0.6809706641889953,
+      "recall_at_0_5": 0.9907540857160465,
+      "f1_at_0_5": 0.807159752628344,
       "n_train_cases": 1089,
       "n_validation_cases": 360,
       "n_train_rows": 2561328,
@@ -43,15 +43,15 @@
       "train_end": "2019-12-25T00:00:00+00:00",
       "validation_start": "2020-01-01T00:00:00+00:00",
       "validation_end": "2020-12-25T00:00:00+00:00",
-      "training_seconds": 14.29
+      "training_seconds": 15.46
     },
     {
       "validation_year": 2021,
-      "roc_auc_micro": 0.9088570893821729,
-      "accuracy_at_0_5": 0.8212343433195005,
-      "precision_at_0_5": 0.7713946626358813,
-      "recall_at_0_5": 0.8614794966590916,
-      "f1_at_0_5": 0.813952112488568,
+      "roc_auc_micro": 0.941402065042792,
+      "accuracy_at_0_5": 0.8756667708866276,
+      "precision_at_0_5": 0.8666130944539586,
+      "recall_at_0_5": 0.8581816379191137,
+      "f1_at_0_5": 0.8623767580938847,
       "n_train_cases": 1090,
       "n_validation_cases": 359,
       "n_train_rows": 2563680,
@@ -62,19 +62,19 @@
       "train_end": "2020-12-25T00:00:00+00:00",
       "validation_start": "2021-01-01T00:00:00+00:00",
       "validation_end": "2021-12-25T00:00:00+00:00",
-      "training_seconds": 13.91
+      "training_seconds": 15.56
     }
   ],
-  "cv_mean_roc_auc_micro": 0.9107658162535025,
-  "cv_std_roc_auc_micro": 0.02532634346254146,
+  "cv_mean_roc_auc_micro": 0.9340513141995829,
+  "cv_std_roc_auc_micro": 0.0356717155906394,
   "holdout_year": 2022,
   "holdout_metrics": {
     "validation_year": 2022,
-    "roc_auc_micro": 0.9382405341418536,
-    "accuracy_at_0_5": 0.8857096263162799,
-    "precision_at_0_5": 0.861158530915853,
-    "recall_at_0_5": 0.7920664730492014,
-    "f1_at_0_5": 0.8251687443425207,
+    "roc_auc_micro": 0.9540090502502387,
+    "accuracy_at_0_5": 0.8977203895256732,
+    "precision_at_0_5": 0.879040149448464,
+    "recall_at_0_5": 0.8112708626239613,
+    "f1_at_0_5": 0.843796976095894,
     "n_train_cases": 1090,
     "n_validation_cases": 365,
     "n_train_rows": 2563680,
@@ -85,7 +85,7 @@
     "train_end": "2021-12-25T00:00:00+00:00",
     "validation_start": "2022-01-01T00:00:00+00:00",
     "validation_end": "2022-12-31T00:00:00+00:00",
-    "training_seconds": 13.51
+    "training_seconds": 14.47
   },
   "model_params": {
     "objective": "binary:logistic",

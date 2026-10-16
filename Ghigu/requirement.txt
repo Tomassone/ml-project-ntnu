@@ -19,3 +19,7 @@ ipykernel
 # dynamic output
 tqdm
 ipywidgets
+
+
+#tuning
+optuna
