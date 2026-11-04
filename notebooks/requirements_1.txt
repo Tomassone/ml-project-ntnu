@@ -1,0 +1,14 @@
+# Python 3.12.3 — packages used by "Short notebook 1.ipynb" (exact versions of the development environment)
+numpy==2.5.4
+pandas==3.0.6
+PyYAML==6.0.3
+xgboost==3.4.1
+lightgbm==4.7.0
+torch==2.14.1
+# GPU (optional): we used the CUDA 13.0 build of PyTorch on an NVIDIA RTX 5060 Laptop GPU (8 GB), installed with
+#   pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cu130
+# Without a GPU the CPU build of the same version is enough; the notebook detects the device by itself.
+
+# to run the notebook
+jupyter
+ipykernel==7.4.0
